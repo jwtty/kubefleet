@@ -913,11 +913,20 @@ func (r *Reconciler) setPlacementStatus(
 	latestSchedulingPolicySnapshot *fleetv1beta1.ClusterSchedulingPolicySnapshot,
 	latestResourceSnapshot *fleetv1beta1.ClusterResourceSnapshot,
 ) (bool, error) {
-	crp.Status.SelectedResources = selectedResourceIDs
 	scheduledCondition := buildScheduledCondition(crp, latestSchedulingPolicySnapshot)
 	crp.SetConditions(scheduledCondition)
-	// set ObservedResourceIndex from the latest resource snapshot's resource index label, before we set Synchronized, Applied conditions.
-	crp.Status.ObservedResourceIndex = latestResourceSnapshot.GetLabels()[fleetv1beta1.ResourceIndexLabel]
+
+	if crp.Spec.Strategy.Type == fleetv1beta1.ExternalRolloutStrategyType {
+		// For external rollout strategy, we first empty resource related status fields.
+		// These fields will be populated after per-cluster resource placement status is settled.
+		crp.Status.SelectedResources = []fleetv1beta1.ResourceIdentifier{}
+		crp.Status.ObservedResourceIndex = ""
+	} else {
+		// For other rollout strategies, we need to set the resource related status fields.
+		crp.Status.SelectedResources = selectedResourceIDs
+		// set ObservedResourceIndex from the latest resource snapshot's resource index label, before we set Synchronized, Applied conditions.
+		crp.Status.ObservedResourceIndex = latestResourceSnapshot.GetLabels()[fleetv1beta1.ResourceIndexLabel]
+	}
 
 	// When scheduledCondition is unknown, appliedCondition should be unknown too.
 	// Note: If the scheduledCondition is failed, it means the placement requirement cannot be satisfied fully. For example,
