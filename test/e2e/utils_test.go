@@ -1420,6 +1420,29 @@ func createCRP(crpName string) {
 	createCRPWithApplyStrategy(crpName, nil)
 }
 
+// createNamespaceOnlyCRP creates a ClusterResourcePlacement with namespace-only selector.
+func createNamespaceOnlyCRP(crpName string) {
+	crp := &placementv1beta1.ClusterResourcePlacement{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: crpName,
+			// Add a custom finalizer; this would allow us to better observe
+			// the behavior of the controllers.
+			Finalizers: []string{customDeletionBlockerFinalizer},
+		},
+		Spec: placementv1beta1.PlacementSpec{
+			ResourceSelectors: namespaceOnlySelector(),
+			Strategy: placementv1beta1.RolloutStrategy{
+				Type: placementv1beta1.RollingUpdateRolloutStrategyType,
+				RollingUpdate: &placementv1beta1.RollingUpdateConfig{
+					UnavailablePeriodSeconds: ptr.To(2),
+				},
+			},
+		},
+	}
+	By(fmt.Sprintf("creating namespace-only placement %s", crpName))
+	Expect(hubClient.Create(ctx, crp)).To(Succeed(), "Failed to create namespace-only CRP %s", crpName)
+}
+
 // ensureUpdateRunDeletion deletes the update run with the given name and checks all related approval requests are also deleted.
 func ensureUpdateRunDeletion(updateRunName string) {
 	updateRun := &placementv1beta1.ClusterStagedUpdateRun{
